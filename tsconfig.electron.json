@@ -1,0 +1,21 @@
+﻿{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "rootDir": "src",
+    "outDir": "dist",
+    "strict": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "types": ["node"],
+    "rewriteRelativeImportExtensions": true
+  },
+  "include": [
+    "src/main/index.ts",
+    "src/preload/index.ts",
+    "src/shared/contracts/ipc.ts"
+  ],
+  "exclude": ["node_modules"]
+}

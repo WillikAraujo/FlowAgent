@@ -2,3 +2,9 @@ node_modules
 .worktrees
 .DS_Store
 *.log
+dist/
+.maestri/
+coverage/
+.env
+.env.*
+!.env.example
