@@ -8,27 +8,79 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <header class="topbar">
-    <div class="logo">
-      <strong>ADE Core</strong> <span class="badge">Orchestrator</span>
-    </div>
+  <!-- Layout Principal: Sidebar + Conteúdo -->
+  <div class="app-layout">
     
-    <div class="actions">
-      <button id="btn-add-term" class="btn primary">+ Novo Terminal</button>
-      <div class="prompt-bar">
-        <input type="text" id="global-prompt-input" placeholder="Comando rápido (ex: dir, git status, ou prompt de IA)..." />
-        <select id="target-terminal-select">
-          <option value="all">Todos os Terminais</option>
-        </select>
-        <button id="btn-send-prompt" class="btn">Disparar</button>
+    <!-- Barra Lateral Esquerda: Git Worktrees -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-title">
+          <span>🌿 Worktrees</span>
+        </div>
+        <button id="btn-toggle-sidebar" class="btn-icon" title="Ocultar Barra Lateral">◀</button>
       </div>
-    </div>
-    <div class="stats" id="term-counter">0 terminais ativos</div>
-  </header>
 
-  <main id="terminals-grid" class="grid-container">
-    <!-- Painéis de terminais criados dinamicamente via app.js -->
-  </main>
+      <div class="repo-box" id="repo-box">
+        <div class="repo-label">Repositório Ativo:</div>
+        <div class="repo-path" id="repo-path">Carregando...</div>
+      </div>
+
+      <div class="sidebar-actions">
+        <button id="btn-show-create-wt" class="btn primary small block">+ Nova Worktree</button>
+      </div>
+
+      <!-- Formulário Inline de Criação de Worktree -->
+      <div class="create-wt-form" id="create-wt-form" style="display: none;">
+        <label>Nome da Branch:</label>
+        <input type="text" id="wt-branch-input" placeholder="ex: feat/auth-agent" />
+        
+        <label>Branch Base:</label>
+        <select id="wt-base-select">
+          <option value="main">main</option>
+        </select>
+
+        <div class="form-buttons">
+          <button id="btn-confirm-create-wt" class="btn primary small">Criar</button>
+          <button id="btn-cancel-create-wt" class="btn small">Cancelar</button>
+        </div>
+      </div>
+
+      <!-- Lista de Worktrees -->
+      <div class="worktree-list" id="worktree-list">
+        <!-- Renderizado dinamicamente via app.js -->
+      </div>
+    </aside>
+
+    <!-- Área Principal -->
+    <div class="main-content">
+      <header class="topbar">
+        <div class="topbar-left">
+          <button id="btn-open-sidebar" class="btn-icon" style="display: none;" title="Exibir Worktrees">☰ Worktrees</button>
+          <div class="logo">
+            <strong>ADE Core</strong> <span class="badge">Orchestrator</span>
+          </div>
+        </div>
+        
+        <div class="actions">
+          <button id="btn-add-term" class="btn primary">+ Terminal Geral</button>
+          <div class="prompt-bar">
+            <input type="text" id="global-prompt-input" placeholder="Comando rápido (ex: dir, git status, ou prompt de IA)..." />
+            <select id="target-terminal-select">
+              <option value="all">Todos os Terminais</option>
+            </select>
+            <button id="btn-send-prompt" class="btn">Disparar</button>
+          </div>
+        </div>
+        
+        <div class="stats" id="term-counter">0 terminais ativos</div>
+      </header>
+
+      <main id="terminals-grid" class="grid-container">
+        <!-- Terminais renderizados aqui -->
+      </main>
+    </div>
+
+  </div>
 
   <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>

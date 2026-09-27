@@ -9,9 +9,205 @@ body {
   background-color: #121214;
   color: #e1e1e6;
   height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+.app-layout {
+  display: flex;
+  height: 100%;
+  width: 100%;
+}
+
+/* =========================================================
+   BARRA LATERAL ESQUERDA: GIT WORKTREES
+   ========================================================= */
+.sidebar {
+  width: 300px;
+  min-width: 300px;
+  background-color: #16161a;
+  border-right: 1px solid #29292e;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  user-select: none;
+}
+
+.sidebar.collapsed {
+  display: none;
+}
+
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  background: #1a1a1f;
+  border-bottom: 1px solid #29292e;
+}
+
+.sidebar-title {
+  font-weight: 600;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #04d361;
+}
+
+.repo-box {
+  padding: 10px 14px;
+  background: #121215;
+  border-bottom: 1px solid #242429;
+}
+
+.repo-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  color: #7c7c8a;
+  margin-bottom: 4px;
+  font-weight: 600;
+}
+
+.repo-path {
+  font-size: 12px;
+  font-family: monospace;
+  color: #a8a8b3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-actions {
+  padding: 10px 14px;
+}
+
+.create-wt-form {
+  margin: 0 14px 10px 14px;
+  padding: 10px;
+  background: #1f1f24;
+  border: 1px solid #323238;
+  border-radius: 6px;
+}
+
+.create-wt-form label {
+  display: block;
+  font-size: 11px;
+  color: #a8a8b3;
+  margin-bottom: 4px;
+  margin-top: 6px;
+}
+
+.create-wt-form label:first-child {
+  margin-top: 0;
+}
+
+.create-wt-form input,
+.create-wt-form select {
+  width: 100%;
+  background: #09090a;
+  border: 1px solid #323238;
+  color: #e1e1e6;
+  padding: 5px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.form-buttons {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.worktree-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wt-card {
+  background: #1a1a1f;
+  border: 1px solid #29292e;
+  border-radius: 6px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: border-color 0.15s ease;
+}
+
+.wt-card:hover {
+  border-color: #383842;
+}
+
+.wt-card.main-repo {
+  border-left: 3px solid #04d361;
+}
+
+.wt-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.wt-branch {
+  font-weight: 600;
+  font-size: 13px;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.wt-badge {
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.wt-badge.clean {
+  background: #103323;
+  color: #04d361;
+}
+
+.wt-badge.dirty {
+  background: #402c0b;
+  color: #fba94c;
+}
+
+.wt-path {
+  font-size: 11px;
+  color: #7c7c8a;
+  font-family: monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wt-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 4px;
+  border-top: 1px solid #242429;
+  padding-top: 6px;
+}
+
+/* =========================================================
+   ÁREA PRINCIPAL & TERMINAIS
+   ========================================================= */
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background-color: #09090a;
 }
 
 .topbar {
@@ -22,6 +218,12 @@ body {
   background-color: #1a1a1e;
   border-bottom: 1px solid #29292e;
   gap: 16px;
+}
+
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .logo {
@@ -53,7 +255,7 @@ body {
   align-items: center;
   gap: 8px;
   flex: 1;
-  max-width: 600px;
+  max-width: 650px;
 }
 
 .prompt-bar input {
@@ -73,6 +275,7 @@ body {
   padding: 6px 8px;
   border-radius: 4px;
   font-size: 12px;
+  max-width: 200px;
 }
 
 .btn {
@@ -85,6 +288,7 @@ body {
   cursor: pointer;
   font-weight: 500;
   transition: all 0.15s ease;
+  white-space: nowrap;
 }
 
 .btn:hover {
@@ -100,6 +304,36 @@ body {
 
 .btn.primary:hover {
   background: #00b352;
+}
+
+.btn.small {
+  padding: 4px 8px;
+  font-size: 11px;
+}
+
+.btn.block {
+  width: 100%;
+}
+
+.btn-icon {
+  background: transparent;
+  border: 1px solid transparent;
+  color: #7c7c8a;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.btn-icon:hover {
+  background: #29292e;
+  color: #fff;
+  border-color: #383842;
+}
+
+.btn-icon.close:hover {
+  background: #e53e3e;
+  color: #fff;
 }
 
 .stats {
@@ -159,29 +393,17 @@ body {
   font-weight: bold;
 }
 
+.terminal-title .branch-tag {
+  background: #1f2722;
+  color: #04d361;
+  padding: 2px 6px;
+  border-radius: 3px;
+  border: 1px solid #2e4a38;
+}
+
 .terminal-actions {
   display: flex;
   gap: 6px;
-}
-
-.btn-icon {
-  background: transparent;
-  border: none;
-  color: #7c7c8a;
-  cursor: pointer;
-  font-size: 12px;
-  padding: 2px 6px;
-  border-radius: 3px;
-}
-
-.btn-icon:hover {
-  background: #29292e;
-  color: #fff;
-}
-
-.btn-icon.close:hover {
-  background: #e53e3e;
-  color: #fff;
 }
 
 .terminal-body {
