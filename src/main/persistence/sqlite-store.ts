@@ -41,6 +41,38 @@ export class EventStoreIntegrityError extends Error {
 
 export class LocalSqliteEventStore {
   #db: DatabaseSync;
+  private batching = false;
+  private pendingEvents: DomainEvent[] = [];
+  private readonly listeners = new Set<(event: DomainEvent) => void>();
+  subscribe(listener: (event: DomainEvent) => void): () => void {
+    this.listeners.add(listener);
+    return () => { this.listeners.delete(listener); };
+  }
+  private publish(event: DomainEvent): void {
+    for (const listener of this.listeners) {
+      try { listener(event); } catch { /* committed writes cannot be undone by observers */ }
+    }
+  }
+  commitBatch(changes: CommitChange[]): DomainEvent[] {
+    assertDatabaseWritable(this.#db);
+    if (this.batching) throw new Error('Nested commit batches are not supported.');
+    this.#db.exec('BEGIN IMMEDIATE');
+    this.batching = true;
+    this.pendingEvents = [];
+    let events: DomainEvent[];
+    try {
+      events = changes.map(change => this.commit(change));
+      this.#db.exec('COMMIT');
+    } catch (error) {
+      this.#db.exec('ROLLBACK');
+      this.pendingEvents = [];
+      throw error;
+    } finally { this.batching = false; }
+    const committed = this.pendingEvents;
+    this.pendingEvents = [];
+    for (const event of committed) this.publish(event);
+    return events;
+  }
   constructor(path: string | Buffer | URL) {
     const databaseKey = databaseKeyForPath(path);
     assertDatabasePathWritable(databaseKey);
@@ -70,13 +102,13 @@ export class LocalSqliteEventStore {
       entityData: change.entityData, correlationId: change.correlationId ?? null,
     })).digest("hex");
 
-    this.#db.exec("BEGIN IMMEDIATE");
+    if (!this.batching) this.#db.exec("BEGIN IMMEDIATE");
     try {
       const duplicate = this.#db.prepare("SELECT * FROM domain_events WHERE event_id=?").get(eventId) as EventRow | undefined;
       if (duplicate) {
         if (duplicate.request_hash !== requestHash) throw new EventIdConflictError();
         const prior = eventFromRow(duplicate);
-        this.#db.exec("COMMIT");
+        if (!this.batching) this.#db.exec("COMMIT");
         return prior;
       }
       const project = this.#db.prepare("SELECT id FROM projects WHERE id=?").get(change.projectId);
@@ -114,9 +146,10 @@ export class LocalSqliteEventStore {
         entityType: change.entityType, revision: revision.revision, occurredAt, origin: change.origin,
         type: change.type, payload: change.payload, ...(change.correlationId ? { correlationId: change.correlationId } : {}),
       });
-      this.#db.exec("COMMIT");
+      if (this.batching) this.pendingEvents.push(event);
+      else { this.#db.exec("COMMIT"); this.publish(event); }
       return event;
-    } catch (error) { this.#db.exec("ROLLBACK"); throw error; }
+    } catch (error) { if (!this.batching) this.#db.exec("ROLLBACK"); throw error; }
   }
 
   getEntity<T extends JsonObject = JsonObject>(projectId: string, entityType: EntityType, entityId: string): EntityRecord<T> | undefined {
@@ -143,6 +176,12 @@ export class LocalSqliteEventStore {
       const entity = this.getEntity<T>(projectId, entityType, row.entity_id);
       return entity ? [entity] : [];
     });
+  }
+  listAggregateEvents(projectId: string, entityType: EntityType, entityId: string, limit = 500): DomainEvent[] {
+    if (!Number.isSafeInteger(limit) || limit < 1 || limit > 5000) throw new RangeError("Aggregate event limit must be between 1 and 5000.");
+    const rows = this.#db.prepare("SELECT * FROM domain_events WHERE project_id=? AND entity_type=? AND entity_id=? ORDER BY revision DESC LIMIT ?")
+      .all(projectId, entityType, entityId, limit) as unknown as EventRow[];
+    return rows.reverse().map(eventFromRow);
   }
 
   listProjects(afterProjectId = "", limit = 500): EntityRecord[] {

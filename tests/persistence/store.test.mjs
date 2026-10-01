@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 import { LocalSqliteEventStore, EventIdConflictError } from "../../src/main/persistence/sqlite-store.ts";
-import { migrateDatabase } from "../../src/main/persistence/migrations.ts";
+import { migrateDatabase, CURRENT_SCHEMA_VERSION } from "../../src/main/persistence/migrations.ts";
 import { exportConsistentDatabase, restoreVerifiedDatabase } from "../../src/main/persistence/backup.ts";
 
 function temp(t, fn) {
@@ -23,11 +23,11 @@ function inspectDatabase(path, options = { readOnly: true }) { return new Databa
 
 test("migrations create from scratch, are repeatable, and roll back", () => {
   const db = new DatabaseSync(":memory:");
-  assert.equal(migrateDatabase(db), 1);
-  assert.equal(migrateDatabase(db), 1);
+  assert.equal(migrateDatabase(db), CURRENT_SCHEMA_VERSION);
+  assert.equal(migrateDatabase(db), CURRENT_SCHEMA_VERSION);
   assert.equal(db.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE type='table' AND name='entity_relations'").get().n, 0);
   assert.equal(migrateDatabase(db, 0), 0);
-  assert.equal(migrateDatabase(db), 1);
+  assert.equal(migrateDatabase(db), CURRENT_SCHEMA_VERSION);
   db.close();
 });
 
@@ -94,7 +94,7 @@ test("restore rejects future schema versions and incompatible structure before c
     const db = new DatabaseSync(path); migrateDatabase(db); db.close();
   }
   const futureDb = new DatabaseSync(future);
-  futureDb.prepare("INSERT INTO schema_migrations(version,applied_at) VALUES (?,?)").run(2, new Date().toISOString());
+  futureDb.prepare("INSERT INTO schema_migrations(version,applied_at) VALUES (?,?)").run(CURRENT_SCHEMA_VERSION + 1, new Date().toISOString());
   futureDb.close();
   const incompatibleDb = new DatabaseSync(incompatible);
   const originalEventsDdl = incompatibleDb.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='domain_events'").get().sql;
@@ -109,6 +109,53 @@ test("restore rejects future schema versions and incompatible structure before c
     await assert.rejects(restoreVerifiedDatabase(source, destination));
     assert.equal(existsSync(destination), false);
   }
+}));
+
+test("restore rejects invalid or prohibited persisted domain content before creating destination", async (t) => temp(t, async (dir) => {
+  const cases = [
+    { name: "forbidden-key", sql: "UPDATE entities SET data_json=? WHERE entity_type='note'", value: JSON.stringify({ title: "N", access_token: "secret-value" }) },
+    { name: "unredacted-token", sql: "UPDATE entities SET data_json=? WHERE entity_type='note'", value: JSON.stringify({ title: "N", body: "refresh_token=secret-value" }) },
+    { name: "terminal-event", sql: "UPDATE domain_events SET payload_json=? WHERE type='note.saved'", value: JSON.stringify({ stdout: "terminal text" }) },
+  ];
+  for (const scenario of cases) {
+    const sourcePath = join(dir, scenario.name + ".sqlite"), destination = join(dir, scenario.name + "-restore.sqlite");
+    const store = new LocalSqliteEventStore(sourcePath);
+    store.commit(project("restore-content"));
+    store.commit(change("restore-content", "note", "n1", { title: "N", body: "safe" }));
+    store.close();
+    const tamper = new DatabaseSync(sourcePath);
+    tamper.prepare(scenario.sql).run(scenario.value);
+    tamper.close();
+    await assert.rejects(restoreVerifiedDatabase(sourcePath, destination));
+    assert.equal(existsSync(destination), false, scenario.name + " must be rejected before destination creation");
+  }
+}));
+
+test("restore rejects an event aggregate without a current entity", async (t) => temp(t, async (dir) => {
+  const sourcePath = join(dir, "orphan-event.sqlite"), destination = join(dir, "orphan-event-restore.sqlite");
+  const store = new LocalSqliteEventStore(sourcePath);
+  store.commit(project("orphan-event"));
+  store.commit(change("orphan-event", "note", "n1", { title: "N", body: "safe" }));
+  store.close();
+  const tamper = new DatabaseSync(sourcePath);
+  tamper.prepare("UPDATE domain_events SET entity_id='ghost' WHERE entity_type='note'").run();
+  tamper.prepare("UPDATE aggregate_revisions SET entity_id='ghost' WHERE entity_type='note'").run();
+  tamper.close();
+  await assert.rejects(restoreVerifiedDatabase(sourcePath, destination));
+  assert.equal(existsSync(destination), false);
+}));
+
+test("restore rejects a well-formed request hash that does not match the latest entity snapshot", async (t) => temp(t, async (dir) => {
+  const sourcePath = join(dir, "hash-mismatch.sqlite"), destination = join(dir, "hash-mismatch-restore.sqlite");
+  const store = new LocalSqliteEventStore(sourcePath);
+  store.commit(project("hash-mismatch"));
+  store.commit(change("hash-mismatch", "note", "n1", { title: "N", body: "safe" }));
+  store.close();
+  const tamper = new DatabaseSync(sourcePath);
+  tamper.prepare("UPDATE domain_events SET request_hash=? WHERE entity_type='note'").run("f".repeat(64));
+  tamper.close();
+  await assert.rejects(restoreVerifiedDatabase(sourcePath, destination));
+  assert.equal(existsSync(destination), false);
 }));
 
 test("replay order uses committed sequence, not occurredAt", (t) => temp(t, (dir) => {
@@ -146,14 +193,15 @@ test("online export filters unselected Evidence and restores a validated copy", 
   assert.equal("db" in source, false);
   source.commit(project("export"));
   source.commit(project("export-other"));
-  source.commit(change("export", "evidence", "keep", { artifactType: "report", displayName: "Review", uri: "file:///review.md" }, { payload: { artifactType: "report", displayName: "Review" } }));
-  source.commit(change("export", "evidence", "drop", { artifactType: "file", displayName: "Other", uri: "file:///other.bin" }, { payload: { artifactType: "file", displayName: "Other" } }));
-  source.commit(change("export-other", "evidence", "keep", { artifactType: "report", displayName: "Other project", uri: "file:///other-project.md" }, { payload: { artifactType: "report", displayName: "Other project" } }));
+  const selectedEvent = source.commit(change("export", "evidence", "keep", { artifactType: "report", displayName: "Review", uri: "file:///review.md" }, { payload: { artifactType: "report", displayName: "Review", uri: "file:///selected-only.md" } }));
+  const omittedEvent = source.commit(change("export", "evidence", "drop", { artifactType: "file", displayName: "Other", uri: "file:///other.bin" }, { payload: { artifactType: "file", displayName: "Other", uri: "file:///unselected-only.bin" } }));
+  source.commit(change("export-other", "evidence", "keep", { artifactType: "report", displayName: "Other project", uri: "file:///other-project.md" }, { payload: { artifactType: "report", displayName: "Other project", uri: "file:///unselected-project.md" } }));
   const archive = join(dir, "export.sqlite"), restoredPath = join(dir, "restored.sqlite");
   const cursorBeforeExport = source.latestSequence("export");
   const projectRevisionBeforeExport = source.getEntity("export", "project", "export").revision;
   const probeDb = inspectDatabase(sourcePath);
   const eventCountBeforeExport = probeDb.prepare("SELECT COUNT(*) AS n FROM domain_events WHERE project_id=?").get("export").n;
+  assert.equal(probeDb.prepare("SELECT payload_json FROM domain_events WHERE event_id=?").get(omittedEvent.eventId).payload_json.includes("unselected-only.bin"), true);
   probeDb.close();
   const exportTask = exportConsistentDatabase(source, archive, [{ projectId: "export", evidenceId: "keep" }]);
   assert.throws(() => source.commit(change("export", "note", "during-export", { title: "N", body: "safe" })), /being exported/);
@@ -173,9 +221,24 @@ test("online export filters unselected Evidence and restores a validated copy", 
   const restored = new DatabaseSync(restoredPath, { readOnly: true });
   assert.equal(restored.prepare("SELECT COUNT(*) AS n FROM entities WHERE entity_type='evidence'").get().n, 1);
   assert.equal(restored.prepare("SELECT entity_id FROM entities WHERE entity_type='evidence'").get().entity_id, "keep");
-  assert.equal(restored.prepare("SELECT COUNT(*) AS n FROM domain_events").get().n, 5);
+  assert.equal(restored.prepare("SELECT COUNT(*) AS n FROM domain_events").get().n, 3);
+  const exportedEvents = restored.prepare("SELECT event_id,sequence,entity_type,payload_json FROM domain_events WHERE project_id='export' ORDER BY sequence").all();
+  assert.deepEqual(exportedEvents.map((event) => event.sequence), [1, 2]);
+  assert.equal(exportedEvents.some((event) => event.event_id === omittedEvent.eventId), false);
+  assert.equal(exportedEvents.some((event) => event.event_id === selectedEvent.eventId), true);
+  assert.equal(JSON.stringify(exportedEvents).includes("unselected-only.bin"), false);
+  assert.equal(JSON.stringify(restored.prepare("SELECT payload_json FROM domain_events").all()).includes("unselected-project.md"), false);
+  assert.equal(JSON.stringify(exportedEvents).includes("selected-only.md"), true);
+  assert.equal(restored.prepare("SELECT sequence FROM project_sequences WHERE project_id='export'").get().sequence, 2);
+  assert.equal(restored.prepare("SELECT COUNT(*) AS n FROM aggregate_revisions WHERE entity_type='evidence'").get().n, 1);
   assert.equal(restored.prepare("PRAGMA integrity_check").get().integrity_check, "ok");
   restored.close();
+  const replayStore = new LocalSqliteEventStore(restoredPath);
+  const replayFromExport = replayStore.readAfter("export", 0);
+  assert.equal(replayFromExport.kind, "events");
+  assert.deepEqual(replayFromExport.events.map((event) => event.sequence), [1, 2]);
+  assert.equal(replayStore.readSnapshot("export").sequence, 2);
+  replayStore.close();
   secondHandle.close(); source.close();
 }));
 

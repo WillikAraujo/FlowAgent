@@ -5,10 +5,15 @@ export interface ProjectData extends JsonObject {
   rootPath: string;
 }
 export interface AgentData extends JsonObject {
-  adapterId: string;
+  providerId: string;
+  role: string;
   displayName: string;
-  detected: boolean;
-  capabilities: JsonObject;
+  status: string;
+  worktreeId: string;
+  taskId: string | null;
+  activeSessionId: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 export interface AgentProfileData extends JsonObject {
   adapterId: string;
@@ -24,12 +29,18 @@ export interface TaskData extends JsonObject {
 }
 export interface SessionData extends JsonObject {
   agentId: string;
+  providerId: string;
+  worktreeId: string;
   status: string;
   resumable: boolean;
   providerSessionId: string | null;
+  createdAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
 }
 export interface ExecutionData extends JsonObject {
-  taskId: string;
+  taskId: string | null;
+  agentId: string;
   sessionId: string;
   status: string;
   startedAt: string | null;
@@ -71,6 +82,8 @@ export interface EntityPayloadMap {
   decision: DecisionData;
   approval: ApprovalData;
   evidence: EvidenceMetadata;
+  message: JsonObject;
+  memory: JsonObject;
 }
 export type EntityOfType<K extends EntityType> = EntityPayloadMap[K];
 

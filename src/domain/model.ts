@@ -1,6 +1,6 @@
 ﻿export const ENTITY_TYPES = [
   "project", "agent", "agentProfile", "task", "session", "execution",
-  "note", "decision", "approval", "evidence",
+  "note", "decision", "approval", "evidence", "message", "memory",
 ] as const;
 
 export type EntityType = (typeof ENTITY_TYPES)[number];

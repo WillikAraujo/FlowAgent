@@ -1,31 +1,45 @@
 {
-    "name":  "ade-core",
-    "version":  "1.0.0",
-    "private":  true,
-    "description":  "ADE desktop local",
-    "main":  "dist/main/index.js",
-    "scripts":  {
-                    "dev":  "npm run build:electron \u0026\u0026 npm run build:preload \u0026\u0026 concurrently -k \"vite --host 127.0.0.1\" \"wait-on http://127.0.0.1:5173 \u0026\u0026 cross-env ADE_RENDERER_URL=http://127.0.0.1:5173 electron .\"",
-                    "build":  "npm run build:electron \u0026\u0026 npm run build:preload \u0026\u0026 npm run typecheck:renderer \u0026\u0026 vite build",
-                    "build:electron":  "tsc -p tsconfig.electron.json",
-                    "typecheck:renderer":  "tsc -p tsconfig.renderer.json",
-                    "test:ade102":  "node --experimental-strip-types --test tests/domain/domain.test.mjs tests/domain/ipc-contract.test.mjs tests/persistence/store.test.mjs",
-                    "build:preload":  "esbuild src/preload/index.ts --bundle --platform=node --format=cjs --target=node22 --external:electron --outfile=dist/preload/index.js"
-                },
-    "dependencies":  {
-                         "react":  "^19.1.0",
-                         "react-dom":  "^19.1.0"
-                     },
-    "devDependencies":  {
-                            "@types/react":  "^19.1.8",
-                            "@types/react-dom":  "^19.1.7",
-                            "@vitejs/plugin-react":  "^4.7.0",
-                            "concurrently":  "^9.2.1",
-                            "cross-env":  "^7.0.3",
-                            "electron":  "^37.2.6",
-                            "typescript":  "^5.8.3",
-                            "vite":  "^6.3.5",
-                            "wait-on":  "^8.0.3",
-                            "@types/node":  "^24.0.0"
-                        }
+  "name": "ade-core",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ADE desktop local",
+  "main": "dist/main/index.js",
+  "scripts": {
+    "dev": "npm run build:electron && npm run build:preload && concurrently -k \"vite --host 127.0.0.1\" \"wait-on http://127.0.0.1:5173 && cross-env ADE_RENDERER_URL=http://127.0.0.1:5173 electron .\"",
+    "build": "npm run build:electron && npm run build:preload && npm run typecheck:renderer && vite build",
+    "build:electron": "tsc -p tsconfig.electron.json",
+    "typecheck:renderer": "tsc -p tsconfig.renderer.json",
+    "test:ade102": "node --experimental-strip-types --test tests/domain/domain.test.mjs tests/domain/ipc-contract.test.mjs tests/persistence/store.test.mjs",
+    "build:preload": "esbuild src/preload/index.ts --bundle --platform=node --format=cjs --target=node22 --external:electron --outfile=dist/preload/index.js",
+    "test:node": "node scripts/test-node.mjs",
+    "test:ui": "vitest run",
+    "test:e2e": "npm run build && playwright test",
+    "test": "npm run build && npm run test:node && npm run test:ui",
+    "check": "npm test && npm run test:e2e"
+  },
+  "dependencies": {
+    "@agentclientprotocol/sdk": "^1.5.1",
+    "@modelcontextprotocol/sdk": "^1.31.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.7",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.7",
+    "@vitejs/plugin-react": "^4.7.0",
+    "concurrently": "^9.2.1",
+    "cross-env": "^7.0.3",
+    "electron": "^37.2.6",
+    "jsdom": "^26.1.0",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.5",
+    "vitest": "^3.2.7",
+    "wait-on": "^8.0.3"
+  }
 }

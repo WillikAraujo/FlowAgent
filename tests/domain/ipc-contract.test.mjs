@@ -16,3 +16,11 @@ test("IPC runtime contract enforces size, exact shape, allowlist and response sh
   assert.throws(() => parseIpcRequest({ operation: "app.getInfo", payload: "x".repeat(MAX_IPC_REQUEST_BYTES) }), (error) => error.category === "payload-too-large");
   assert.throws(() => parseIpcResponse("app.getInfo", { ok: true, value: { name: "ADE" } }), IpcContractError);
 });
+
+test("FlowAgent start and run snapshots accept their declared response shapes", () => {
+  const start = { ok: true, value: { requestId: "request-1", projectId: "project-1", runId: "run-1", state: "queued" } };
+  const run = { ok: true, value: { projectId: "project-1", runId: "run-1", state: "running", profile: "reviewer" } };
+  assert.deepEqual(parseIpcResponse("flowAgent.start", start), start);
+  assert.deepEqual(parseIpcResponse("flowAgent.getRun", run), run);
+  assert.throws(() => parseIpcResponse("flowAgent.getRun", { ok: true, value: { ...run.value, profile: "invalid" } }), IpcContractError);
+});
